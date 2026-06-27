@@ -8,9 +8,9 @@ from math import floor
 
 if TYPE_CHECKING:
     from .world import ITGMania
-"""
-Items in ITGManaia are either charts, or filler items (appearance options, speed mods, etc).
 
+"""
+Items in ITGManaia are either charts, or visual mods (appearance options, speed mods, etc).
 """
 
 class ITGManiaItem(Item):
@@ -63,6 +63,7 @@ def create_item(world: ITGMania, name: str) -> ITGManiaItem:
 
 def create_all_items(world: ITGMania) -> None:
     # Total locations is determined by the number of active locations per selected song
+    # e.g., if you've got the 85 and 90 score checks enabled, each song will have 4 locations: -0, -1, -85, -90
     active_suffixes = ["-0", "-1"]
     if world.options.include_85_score_checks:
         active_suffixes.append("-85")
