@@ -5,14 +5,33 @@ local AP = {}
 local HOST = "ws://localhost:38281"
 local SLOT = "ITGManiaPlayer"
 local PASSWORD = ""
-local MODULE_TAG = "[AP-SLmodule]"
+local MODULE_TAG = "[AP-Module]"
 local ENABLE_PENDING_SCORES = true -- Enable saving failed score submissions for retry when offline
 local MAX_PENDING_SCORES = 50      -- Maximum number of pending scores stored per player
+
+-- Define local logging wrappers that prepend MODULE_TAG to all screen and log outputs
+local original_SM = SM
+local AP_SM = function(msg)
+	if original_SM then
+		original_SM(MODULE_TAG .. " " .. tostring(msg))
+	else
+		SCREENMAN:SystemMessage(MODULE_TAG .. " " .. tostring(msg))
+	end
+end
+
+local original_Trace = Trace
+local Trace = function(msg)
+	if original_Trace then
+		original_Trace(MODULE_TAG .. " " .. tostring(msg))
+	else
+		print(MODULE_TAG .. " " .. tostring(msg))
+	end
+end
 
 -- global to this mod
 local GAME_NAME = "ITGMania"
 
-SCREENMAN:SystemMessage("Hola from lua!")
+AP_SM("Hola from lua!")
 
 -- Guarded stub declarations (only for tooling; real objects provided by engine at runtime)
 if not PROFILEMAN then PROFILEMAN = { GetProfileDir = function(...) return "" end } end
@@ -86,7 +105,19 @@ local UpdatePlaylist = function()
 			file:Write(playlist_content)
 			file:Close()
 			file:destroy()
-			SM("Updated Archipelago playlist: " .. count .. " songs")
+			AP_SM("Updated Archipelago playlist: " .. count .. " songs")
+			
+			-- Force C++ engine to reload the playlist from disk
+			SONGMAN:SetPreferredSongs(path, true)
+			
+			-- If currently on ScreenSelectMusic and sorted by Preferred, refresh the wheel
+			local top = SCREENMAN:GetTopScreen()
+			if top and top:GetName() == "ScreenSelectMusic" then
+				local wheel = top:GetMusicWheel()
+				if wheel and GAMESTATE:GetSortOrder() == "SortOrder_Preferred" then
+					wheel:ChangeSort("SortOrder_Preferred")
+				end
+			end
 		else
 			Trace("Archipelago error: Could not open '" .. path .. "' to write playlist.")
 		end
@@ -117,7 +148,7 @@ local EvaluateCompletedSong = function()
 		return
 	end
 	
-	SM("Evaluating completed AP song: " .. chart_name)
+	AP_SM("Evaluating completed AP song: " .. chart_name)
 	
 	local checks_to_send = {}
 	local queue_check = function(suffix)
@@ -158,7 +189,7 @@ local EvaluateCompletedSong = function()
 				score_system_name = "High EX (FA+)"
 			end
 			
-			SM("Player " .. ToEnumShortString(pn) .. " Performance - " .. score_system_name .. " Score: " .. string.format("%.2f", activePercent) .. "% (Money: " .. string.format("%.2f", moneyPercent) .. "%" .. (CalculateExScore and (", EX: " .. string.format("%.2f", exPercent) .. "%") or "") .. "), Failed: " .. tostring(is_failed))
+			AP_SM("Player " .. ToEnumShortString(pn) .. " Performance - " .. score_system_name .. " Score: " .. string.format("%.2f", activePercent) .. "% (Money: " .. string.format("%.2f", moneyPercent) .. "%" .. (CalculateExScore and (", EX: " .. string.format("%.2f", exPercent) .. "%") or "") .. "), Failed: " .. tostring(is_failed))
 			
 			-- Check clear condition
 			local fail_allowed = (slotOptions.fail_allowed == true or slotOptions.fail_allowed == 1)
@@ -170,7 +201,7 @@ local EvaluateCompletedSong = function()
 			end
 			
 			if passed_clear then
-				SM("Player " .. ToEnumShortString(pn) .. " CLEARED the song logic!")
+				AP_SM("Player " .. ToEnumShortString(pn) .. " CLEARED the song logic!")
 				queue_check("0")
 				queue_check("1")
 				
@@ -181,23 +212,23 @@ local EvaluateCompletedSong = function()
 				if activePercent >= 98 then queue_check("98") end
 				if activePercent >= 99 then queue_check("99") end
 			else
-				SM("Player " .. ToEnumShortString(pn) .. " did not clear the song logic (Passing Score target: " .. tostring(slotOptions.passing_score) .. "%)")
+				AP_SM("Player " .. ToEnumShortString(pn) .. " did not clear the song logic (Passing Score target: " .. tostring(slotOptions.passing_score) .. "%)")
 			end
 			
 			-- Quad and Quint are independent of the selected score_type
 			if moneyPercent >= 100 then
-				SM("Player " .. ToEnumShortString(pn) .. " got a QUAD money score!")
+				AP_SM("Player " .. ToEnumShortString(pn) .. " got a QUAD money score!")
 				queue_check("quad")
 			end
 			if exPercent >= 100 and CalculateExScore then
-				SM("Player " .. ToEnumShortString(pn) .. " got a QUINT EX score!")
+				AP_SM("Player " .. ToEnumShortString(pn) .. " got a QUINT EX score!")
 				queue_check("quint")
 			end
 		end
 	end
 	
 	if #checks_to_send > 0 and apHandlerInstance and apHandlerInstance.connected and apHandlerInstance.socket then
-		SM("Sending " .. tostring(#checks_to_send) .. " location checks to server...")
+		AP_SM("Sending " .. tostring(#checks_to_send) .. " location checks to server...")
 		local checks_packet = {
 			["cmd"] = "LocationChecks",
 			locations = checks_to_send
@@ -205,7 +236,7 @@ local EvaluateCompletedSong = function()
 		local payload = JsonEncode({ checks_packet })
 		apHandlerInstance.socket:Send(payload, false)
 	else
-		SM("No locations to check or client is not connected.")
+		AP_SM("No locations to check or client is not connected.")
 	end
 end
 
@@ -221,7 +252,7 @@ CreateAPHandler = function()
 			self.connected = false
 			self.errorMsg = nil
 
-			SM("Connecting to Archipelago server at: " .. HOST)
+			AP_SM("Connecting to Archipelago server at: " .. HOST)
 
 			-- Connection time.
 			self.socket = NETWORK:WebSocket{
@@ -230,17 +261,17 @@ CreateAPHandler = function()
 				automaticReconnect=true,
 				onMessage=function(msg)
 					if msg.type == "WebSocketMessageType_Open" then
-						SM("WebSocket transport connected. Waiting for RoomInfo...")
+						AP_SM("WebSocket transport connected. Waiting for RoomInfo...")
 					elseif msg.type == "WebSocketMessageType_Close" then
 						self.connected = false
-						SM("Archipelago connection closed: " .. tostring(msg.reason))
+						AP_SM("Archipelago connection closed: " .. tostring(msg.reason))
 					elseif msg.type == "WebSocketMessageType_Error" then
 						self.connected = false
-						SM("Archipelago connection error: " .. tostring(msg.reason))
+						AP_SM("Archipelago connection error: " .. tostring(msg.reason))
 					elseif msg.type == "WebSocketMessageType_Message" then
 						local success, packets = pcall(JsonDecode, msg.data)
 						if not success then
-							SM("Failed to decode JSON from Archipelago server: " .. tostring(msg.data))
+							AP_SM("Failed to decode JSON from Archipelago server: " .. tostring(msg.data))
 							return
 						end
 
@@ -248,7 +279,7 @@ CreateAPHandler = function()
 							local packet_cmd = packet["cmd"]
 							if packet_cmd == "RoomInfo" then
 								seedName = packet["seed_name"] or "Unknown"
-								SM("Received RoomInfo (Seed: " .. seedName .. "). Requesting DataPackage...")
+								AP_SM("Received RoomInfo (Seed: " .. seedName .. "). Requesting DataPackage...")
 								local get_dp_packet = {
 									["cmd"] = "GetDataPackage",
 									games = { GAME_NAME }
@@ -298,9 +329,9 @@ CreateAPHandler = function()
 										end
 									end
 								end
-								SM("Loaded " .. tostring(count) .. " item names, " .. tostring(loc_count) .. " locations, and " .. tostring(cached_folders) .. " folder mappings from DataPackage.")
+								AP_SM("Loaded " .. tostring(count) .. " item names, " .. tostring(loc_count) .. " locations, and " .. tostring(cached_folders) .. " folder mappings from DataPackage.")
 
-								SM("Sending Connect packet...")
+								AP_SM("Sending Connect packet...")
 								local connect_packet = {
 									["cmd"] = "Connect",
 									game = GAME_NAME,
@@ -316,22 +347,22 @@ CreateAPHandler = function()
 								self.socket:Send(connect_payload, false)
 							elseif packet_cmd == "Connected" then
 								self.connected = true
-								SM("Successfully connected to Archipelago! Slot: " .. tostring(packet.slot))
+								AP_SM("Successfully connected to Archipelago! Slot: " .. tostring(packet.slot))
 								if packet["slot_data"] then
 									slotOptions.score_type = packet["slot_data"]["score_type"] or 1
 									slotOptions.passing_score = packet["slot_data"]["passing_score"] or 0
 									slotOptions.fail_allowed = packet["slot_data"]["fail_allowed"]
-									SM("Slot Options - Score Type: " .. tostring(slotOptions.score_type) .. 
+									AP_SM("Slot Options - Score Type: " .. tostring(slotOptions.score_type) .. 
 									   ", Passing Score: " .. tostring(slotOptions.passing_score) .. 
 									   ", Fail Allowed: " .. tostring(slotOptions.fail_allowed))
 								end
 							elseif packet_cmd == "RoomUpdate" then
-								SM("Received RoomUpdate from server.")
+								AP_SM("Received RoomUpdate from server.")
 								if packet["slot_data"] then
 									slotOptions.score_type = packet["slot_data"]["score_type"] or slotOptions.score_type
 									slotOptions.passing_score = packet["slot_data"]["passing_score"] or slotOptions.passing_score
 									slotOptions.fail_allowed = packet["slot_data"]["fail_allowed"] or slotOptions.fail_allowed
-									SM("Updated Slot Options - Score Type: " .. tostring(slotOptions.score_type) .. 
+									AP_SM("Updated Slot Options - Score Type: " .. tostring(slotOptions.score_type) .. 
 									   ", Passing Score: " .. tostring(slotOptions.passing_score) .. 
 									   ", Fail Allowed: " .. tostring(slotOptions.fail_allowed))
 								end
@@ -339,7 +370,7 @@ CreateAPHandler = function()
 								self.connected = false
 								local errs = packet.errors or {}
 								local errStr = table.concat(errs, ", ")
-								SM("Archipelago connection refused: " .. errStr)
+								AP_SM("Archipelago connection refused: " .. errStr)
 							elseif packet_cmd == "PrintJSON" then
 								local parts = packet.data or {}
 								local message = ""
@@ -348,11 +379,11 @@ CreateAPHandler = function()
 										message = message .. part.text
 									end
 								end
-								SM(message)
+								AP_SM(message)
 							elseif packet_cmd == "ReceivedItems" then
 								local item_count = packet.items and #packet.items or 0
 								local base_idx = packet["index"] or 0
-								SM("Received " .. tostring(item_count) .. " items from server (index " .. tostring(base_idx) .. ")")
+								AP_SM("Received " .. tostring(item_count) .. " items from server (index " .. tostring(base_idx) .. ")")
 								if packet.items then
 									if base_idx == 0 then
 										AP_AllReceivedItems = {}
@@ -362,9 +393,9 @@ CreateAPHandler = function()
 										local item_id = item.item
 										local name = itemNames[item_id] or "Unknown Item"
 										if name:find("/") then
-											SM("Received Song: " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
+											AP_SM("Received Song: " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
 										else
-											SM("Received Mod/Filler (Non-Song): " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
+											AP_SM("Received Mod/Filler (Non-Song): " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
 										end
 									end
 									UpdatePlaylist()
@@ -398,3 +429,4 @@ modules["ScreenEvaluationStage"] = evaluation_trigger
 modules["ScreenEvaluationNonstop"] = evaluation_trigger
 
 return modules
+
