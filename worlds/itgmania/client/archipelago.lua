@@ -25,6 +25,8 @@ local apHandler = nil
 local apHandlerInstance = nil
 local apHandlerShuttingDown = false
 local itemNames = {}
+local seedName = "Unknown"
+local AP_AllReceivedItems = {}
 
 GetAPHandlerInstance = function()
 	return apHandlerInstance
@@ -36,6 +38,52 @@ local CreateRequest = function(event, data)
 		event=event,
 		data=data
 	})
+end
+
+
+local UpdatePlaylist = function()
+	if seedName == "Unknown" then return end
+	local path = THEME:GetCurrentThemeDirectory() .. "Other/Playlists/Archipelago - " .. seedName .. ".txt"
+	local playlist_content = "--- Archipelago\n"
+	local count = 0
+	
+	for _, item in ipairs(AP_AllReceivedItems) do
+		local item_id = item.item
+		local item_name = itemNames[item_id]
+		if item_name then
+			-- Parse the path to get only the song directory name (the middle part in Group/Folder/File)
+			local parts = {}
+			for part in item_name:gmatch("[^/]+") do
+				table.insert(parts, part)
+			end
+			local songFolder = nil
+			if #parts >= 2 then
+				songFolder = parts[2]
+			elseif #parts == 1 then
+				songFolder = parts[1]
+			end
+			
+			if songFolder then
+				playlist_content = playlist_content .. songFolder .. "\n"
+				count = count + 1
+				if not SONGMAN:FindSong(songFolder) then
+					Trace("Archipelago warning: Received song is not installed: " .. songFolder)
+				end
+			end
+		end
+	end
+	
+	if count > 0 then
+		local file = RageFileUtil.CreateRageFile()
+		if file:Open(path, 2) then
+			file:Write(playlist_content)
+			file:Close()
+			file:destroy()
+			SM("Updated Archipelago playlist: " .. count .. " songs")
+		else
+			Trace("Archipelago error: Could not open '" .. path .. "' to write playlist.")
+		end
+	end
 end
 
 -- HTTP Communication
@@ -76,7 +124,8 @@ CreateAPHandler = function()
 						for _, packet in ipairs(packets) do
 							local packet_cmd = packet["cmd"]
 							if packet_cmd == "RoomInfo" then
-								SM("Received RoomInfo. Requesting DataPackage...")
+								seedName = packet["seed_name"] or "Unknown"
+								SM("Received RoomInfo (Seed: " .. seedName .. "). Requesting DataPackage...")
 								local get_dp_packet = {
 									["cmd"] = "GetDataPackage",
 									games = { GAME_NAME }
@@ -131,13 +180,19 @@ CreateAPHandler = function()
 								SM(message)
 							elseif packet_cmd == "ReceivedItems" then
 								local item_count = packet.items and #packet.items or 0
-								SM("Received " .. tostring(item_count) .. " items from server (index " .. tostring(packet.index) .. ")")
+								local base_idx = packet["index"] or 0
+								SM("Received " .. tostring(item_count) .. " items from server (index " .. tostring(base_idx) .. ")")
 								if packet.items then
+									if base_idx == 0 then
+										AP_AllReceivedItems = {}
+									end
 									for i, item in ipairs(packet.items) do
+										AP_AllReceivedItems[base_idx + i] = item
 										local item_id = item.item
 										local name = itemNames[item_id] or "Unknown Item"
 										SM("Item: " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
 									end
+									UpdatePlaylist()
 								end
 							else
 								Trace("Received unhandled cmd: " .. tostring(packet_cmd))
