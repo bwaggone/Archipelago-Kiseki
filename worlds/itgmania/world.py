@@ -48,7 +48,7 @@ class ITGMania(World):
         from .items import get_song_data
         from Options import OptionError
 
-        available_charts = get_song_data()
+        available_charts = [c for c in get_song_data() if c.style == "Dance_Single"]
 
         num_charts = self.options.number_of_charts.value
         num_starting = min(self.options.number_of_starting_charts.value, num_charts)

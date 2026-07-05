@@ -57,7 +57,7 @@ local UpdatePlaylist = function()
 	for _, item in ipairs(AP_AllReceivedItems) do
 		local item_id = item.item
 		local item_name = itemNames[item_id]
-		if item_name then
+		if item_name and item_name:find("/") then
 			-- Parse the path to get only the song directory name (the middle part in Group/Folder/File)
 			local parts = {}
 			for part in item_name:gmatch("[^/]+") do
@@ -361,7 +361,11 @@ CreateAPHandler = function()
 										AP_AllReceivedItems[base_idx + i] = item
 										local item_id = item.item
 										local name = itemNames[item_id] or "Unknown Item"
-										SM("Item: " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
+										if name:find("/") then
+											SM("Received Song: " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
+										else
+											SM("Received Mod/Filler (Non-Song): " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
+										end
 									end
 									UpdatePlaylist()
 								end
