@@ -48,6 +48,23 @@ local locationIds = {}
 local folderToChartName = {}
 local seedName = "Unknown"
 local AP_AllReceivedItems = {}
+local initialSyncComplete = false
+
+local FormatNotificationName = function(name)
+	if not name then return "Unknown" end
+	if name:find("/") then
+		local parts = {}
+		for part in name:gmatch("[^/]+") do
+			table.insert(parts, part)
+		end
+		if #parts >= 2 then
+			return parts[2]
+		elseif #parts == 1 then
+			return parts[1]
+		end
+	end
+	return name
+end
 local slotOptions = {
 	score_type = 1,
 	passing_score = 0,
@@ -235,6 +252,7 @@ local EvaluateCompletedSong = function()
 		}
 		local payload = JsonEncode({ checks_packet })
 		apHandlerInstance.socket:Send(payload, false)
+		MESSAGEMAN:Broadcast("APItemNotification", { type = "Sent", name = chart_name })
 	else
 		AP_SM("No locations to check or client is not connected.")
 	end
@@ -264,10 +282,14 @@ CreateAPHandler = function()
 						AP_SM("WebSocket transport connected. Waiting for RoomInfo...")
 					elseif msg.type == "WebSocketMessageType_Close" then
 						self.connected = false
+						initialSyncComplete = false
 						AP_SM("Archipelago connection closed: " .. tostring(msg.reason))
+						MESSAGEMAN:Broadcast("APItemNotification", { type = "Disconnected" })
 					elseif msg.type == "WebSocketMessageType_Error" then
 						self.connected = false
+						initialSyncComplete = false
 						AP_SM("Archipelago connection error: " .. tostring(msg.reason))
+						MESSAGEMAN:Broadcast("APItemNotification", { type = "Disconnected" })
 					elseif msg.type == "WebSocketMessageType_Message" then
 						local success, packets = pcall(JsonDecode, msg.data)
 						if not success then
@@ -347,7 +369,9 @@ CreateAPHandler = function()
 								self.socket:Send(connect_payload, false)
 							elseif packet_cmd == "Connected" then
 								self.connected = true
+								initialSyncComplete = false
 								AP_SM("Successfully connected to Archipelago! Slot: " .. tostring(packet.slot))
+								MESSAGEMAN:Broadcast("APItemNotification", { type = "Connected", name = packet.slot })
 								if packet["slot_data"] then
 									slotOptions.score_type = packet["slot_data"]["score_type"] or 1
 									slotOptions.passing_score = packet["slot_data"]["passing_score"] or 0
@@ -385,6 +409,7 @@ CreateAPHandler = function()
 								local base_idx = packet["index"] or 0
 								AP_SM("Received " .. tostring(item_count) .. " items from server (index " .. tostring(base_idx) .. ")")
 								if packet.items then
+									local isNewItem = self.connected and initialSyncComplete
 									if base_idx == 0 then
 										AP_AllReceivedItems = {}
 									end
@@ -397,7 +422,11 @@ CreateAPHandler = function()
 										else
 											AP_SM("Received Mod/Filler (Non-Song): " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
 										end
+										if isNewItem then
+											MESSAGEMAN:Broadcast("APItemNotification", { type = "Received", name = name })
+										end
 									end
+									initialSyncComplete = true
 									UpdatePlaylist()
 								end
 							else
@@ -417,16 +446,138 @@ end
 CreateAPHandler()
 apHandler:InitCommand()
 
-local evaluation_trigger = Def.Actor{
-	ModuleCommand=function(self)
-		EvaluateCompletedSong()
+local notificationQueue = {}
+local isNotificationActive = false
+
+local function MakePopupActor()
+	return Def.ActorFrame {
+		InitCommand = function(self)
+			self:xy(-300, _screen.h - 100)
+		end,
+		APItemNotificationMessageCommand = function(self, params)
+			table.insert(notificationQueue, params)
+			if not isNotificationActive then
+				self:queuecommand("ShowNext")
+			end
+		end,
+		ShowNextCommand = function(self)
+			if #notificationQueue == 0 then
+				isNotificationActive = false
+				return
+			end
+			
+			isNotificationActive = true
+			local params = table.remove(notificationQueue, 1)
+			
+			local text = ""
+			local sub = ""
+			local color_highlight = {1, 1, 1, 1}
+			
+			if params.type == "Received" then
+				text = "RECEIVED"
+				sub = FormatNotificationName(params.name)
+				color_highlight = {0.3, 0.9, 0.3, 1}
+			elseif params.type == "Sent" then
+				text = "CHECK SENT"
+				sub = FormatNotificationName(params.name)
+				color_highlight = {0.3, 0.6, 0.9, 1}
+			elseif params.type == "Connected" then
+				text = "ARCHIPELAGO"
+				sub = "CONNECTED: " .. tostring(params.name)
+				color_highlight = {0.3, 0.9, 0.9, 1}
+			elseif params.type == "Disconnected" then
+				text = "ARCHIPELAGO"
+				sub = "DISCONNECTED"
+				color_highlight = {1, 0.3, 0.3, 1}
+			end
+			
+			local label = self:GetChild("Title")
+			local subtext = self:GetChild("Subtext")
+			local strip = self:GetChild("AccentStrip")
+			
+			if label then
+				label:settext(text)
+				label:diffuse(color_highlight)
+			end
+			if subtext then
+				subtext:settext(sub)
+			end
+			if strip then
+				strip:diffuse(color_highlight)
+			end
+			
+			self:finishtweening()
+			self:linear(0.25):x(20)
+			self:sleep(1.0)
+			self:linear(0.25):x(-300)
+			self:queuecommand("ShowNext")
+		end,
+		
+		Def.Quad {
+			Name = "Background",
+			InitCommand = function(self)
+				self:zoomto(260, 48)
+				self:halign(0):valign(0)
+				self:diffuse(0, 0, 0, 0.8)
+			end
+		},
+		Def.Quad {
+			Name = "AccentStrip",
+			InitCommand = function(self)
+				self:zoomto(4, 48)
+				self:halign(0):valign(0)
+				self:diffuse(1, 1, 1, 1)
+			end
+		},
+		LoadFont("Common Bold") .. {
+			Name = "Title",
+			InitCommand = function(self)
+				self:xy(12, 8)
+				self:halign(0):valign(0)
+				self:zoom(0.6)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Subtext",
+			InitCommand = function(self)
+				self:xy(12, 28)
+				self:halign(0):valign(0)
+				self:zoom(0.5)
+				self:maxwidth(240)
+			end
+		}
+	}
+end
+
+local function MakeScreenActor(screenName)
+	local af = Def.ActorFrame {
+		MakePopupActor(),
+	}
+	
+	if screenName:find("ScreenEvaluation") then
+		af[#af+1] = Def.Actor {
+			ModuleCommand = function(self)
+				EvaluateCompletedSong()
+			end
+		}
 	end
+	
+	return af
+end
+
+local screens = {
+	"ScreenTitleMenu",
+	"ScreenSelectMusic",
+	"ScreenGameplay",
+	"ScreenEvaluationNormal",
+	"ScreenEvaluationStage",
+	"ScreenEvaluationNonstop"
 }
 
 local modules = {}
-modules["ScreenEvaluationNormal"] = evaluation_trigger
-modules["ScreenEvaluationStage"] = evaluation_trigger
-modules["ScreenEvaluationNonstop"] = evaluation_trigger
+for _, screen in ipairs(screens) do
+	modules[screen] = MakeScreenActor(screen)
+end
 
 return modules
 
