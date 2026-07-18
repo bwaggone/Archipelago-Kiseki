@@ -1,3 +1,6 @@
+-- This file hanldes AP communication with the server, which includes
+-- populating the local map of items to human readable names.
+
 local AP = ...
 
 AP.HandleMessage = function(self, msg)
@@ -6,13 +9,15 @@ AP.HandleMessage = function(self, msg)
 	elseif msg.type == "WebSocketMessageType_Close" then
 		self.connected = false
 		AP.initialSyncComplete = false
+		AP.connectedSlotName = nil
 		AP.AP_SM("Archipelago connection closed: " .. tostring(msg.reason))
-		MESSAGEMAN:Broadcast("APItemNotification", { type = "Disconnected" })
+		AP.QueueNotification({ type = "Disconnected" })
 	elseif msg.type == "WebSocketMessageType_Error" then
 		self.connected = false
 		AP.initialSyncComplete = false
+		AP.connectedSlotName = nil
 		AP.AP_SM("Archipelago connection error: " .. tostring(msg.reason))
-		MESSAGEMAN:Broadcast("APItemNotification", { type = "Disconnected" })
+		AP.QueueNotification({ type = "Disconnected" })
 	elseif msg.type == "WebSocketMessageType_Message" then
 		local success, packets = pcall(JsonDecode, msg.data)
 		if not success then
@@ -93,8 +98,8 @@ AP.HandleMessage = function(self, msg)
 			elseif packet_cmd == "Connected" then
 				self.connected = true
 				AP.initialSyncComplete = false
+				AP.connectedSlotName = packet.slot
 				AP.AP_SM("Successfully connected to Archipelago! Slot: " .. tostring(packet.slot))
-				MESSAGEMAN:Broadcast("APItemNotification", { type = "Connected", name = packet.slot })
 				
 				AP.checkedLocations = {}
 				AP.activeLocationIds = {}
@@ -175,11 +180,16 @@ AP.HandleMessage = function(self, msg)
 							AP.AP_SM("Received Mod/Filler (Non-Song): " .. name .. " (ID=" .. tostring(item_id) .. ", Location=" .. tostring(item.location) .. ", Player=" .. tostring(item.player) .. ")")
 						end
 						if isNewItem then
-							MESSAGEMAN:Broadcast("APItemNotification", { type = "Received", name = name })
+							AP.QueueNotification({ type = "Received", name = name })
 						end
 					end
 					AP.initialSyncComplete = true
 					AP.UpdatePlaylist()
+					
+					if AP.connectedSlotName then
+						AP.QueueNotification({ type = "Connected", name = AP.connectedSlotName })
+						AP.connectedSlotName = nil
+					end
 				end
 			else
 				AP.Trace("Received unhandled cmd: " .. tostring(packet_cmd))

@@ -3,14 +3,50 @@
 
 local AP = ...
 
-AP.MakePopupActor = function()
+AP.QueueNotification = function(params)
+	if params.type == "Connected" then
+		AP.hasShownConnectedPopup = true
+	end
+	table.insert(AP.notificationQueue, params)
+	MESSAGEMAN:Broadcast("APTriggerShowNext")
+end
+
+AP.MakePopupActor = function(screenName)
+	local isScreenActive = false
+	
 	return Def.ActorFrame {
 		InitCommand = function(self)
 			self:xy(-300, _screen.h - 100)
+			isScreenActive = false
 		end,
-		APItemNotificationMessageCommand = function(self, params)
-			table.insert(AP.notificationQueue, params)
-			if not AP.isNotificationActive then
+		ScreenChangedMessageCommand = function(self)
+			local screen = SCREENMAN:GetTopScreen()
+			if screen and screen:GetName() == screenName then
+				-- Transitioning to our screen
+			else
+				if isScreenActive then
+					isScreenActive = false
+					self:finishtweening()
+					self:x(-300)
+					AP.isNotificationActive = false
+				end
+			end
+		end,
+		ModuleCommand = function(self)
+			isScreenActive = true
+			
+			-- Handle startup connection popup if initial sync completed before UI loaded
+			if AP.initialSyncComplete and not AP.hasShownConnectedPopup and AP.apHandlerInstance and AP.apHandlerInstance.connected then
+				local slotName = AP.SLOT or "Unknown"
+				AP.QueueNotification({ type = "Connected", name = slotName })
+			end
+			
+			if #AP.notificationQueue > 0 and not AP.isNotificationActive then
+				self:queuecommand("ShowNext")
+			end
+		end,
+		APTriggerShowNextMessageCommand = function(self)
+			if isScreenActive and not AP.isNotificationActive then
 				self:queuecommand("ShowNext")
 			end
 		end,
@@ -601,10 +637,26 @@ end
 
 AP.MakeScreenActor = function(screenName)
 	local af = Def.ActorFrame {
-		AP.MakePopupActor(),
+		AP.MakePopupActor(screenName),
 	}
 	
 	if screenName == "ScreenSelectMusic" then
+		-- Small helper text in the header: "Press F10 for AP Status"
+		af[#af+1] = LoadFont("Common Header") .. {
+			Name = "APStatusHelperText",
+			Text = "Press F10 for AP Status",
+			InitCommand = function(self)
+				self:xy(_screen.w - SL_WideScale(205, 245), 15)
+				self:zoom(SL_WideScale(0.4, 0.46))
+				self:diffusealpha(0)
+				self:halign(0.5):valign(0.5)
+			end,
+			ModuleCommand = function(self)
+				self:stoptweening()
+				self:diffusealpha(0):sleep(0.1):decelerate(0.33):diffusealpha(1)
+			end
+		}
+		
 		af[#af+1] = AP.MakeStatusOverlayActor()
 	end
 	

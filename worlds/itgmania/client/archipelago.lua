@@ -20,6 +20,7 @@ AP.folderToChartName = {}
 AP.seedName = "Unknown"
 AP.AP_AllReceivedItems = {}
 AP.initialSyncComplete = false
+AP.hasShownConnectedPopup = false
 AP.slotOptions = {
 	score_type = 1,
 	passing_score = 0,
