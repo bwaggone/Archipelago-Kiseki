@@ -139,100 +139,6 @@ AP.MakePopupActor = function(screenName)
 	}
 end
 
--- Helper function to get all unlocked songs / charts from received items.
--- Unlocked songs are defined as received items containing a "/" character in their name.
-local function getUnlockedSongs()
-	local songs = {}
-	local seen = {}
-	if AP.AP_AllReceivedItems then
-		for _, item in ipairs(AP.AP_AllReceivedItems) do
-			local name = AP.itemNames[item.item]
-			if name and name:find("/") and not seen[name] then
-				seen[name] = true
-				table.insert(songs, name)
-			end
-		end
-	end
-	-- Sort alphabetically for better navigation
-	table.sort(songs)
-	return songs
-end
-
-local function getChecksForSong(chart_name)
-	local total = 0
-	local completed = 0
-	if AP.locationIds then
-		for name, id in pairs(AP.locationIds) do
-			if name:sub(1, #chart_name + 1) == chart_name .. "-" then
-				-- If activeLocationIds is populated, only count active locations.
-				-- Otherwise, fall back to counting all defined locations.
-				if not AP.activeLocationIds or AP.activeLocationIds[id] then
-					total = total + 1
-					if AP.checkedLocations and AP.checkedLocations[id] then
-						completed = completed + 1
-					end
-				end
-			end
-		end
-	end
-	return completed, total
-end
-
--- Helper to get stats on unlocked Archipelago modifiers.
--- Traverses received items to determine:
--- 1. Highest BPM speed limit modifier item (e.g. "Speed 550bpm")
--- 2. Darkest background filter modifier item (e.g. "Darker Filter")
--- 3. Number of "Bonus Percentage" items received
-local function getModifierStats()
-	local max_bpm = "250 BPM"
-	local max_filter = "None"
-	local bonus_count = 0
-
-	local speed_items = {
-		["Speed 350bpm"] = 350,
-		["Speed 450bpm"] = 450,
-		["Speed 550bpm"] = 550,
-		["Speed 650bpm"] = 650,
-		["Speed 750bpm"] = 750,
-		["Speed Any BPM"] = 9999,
-	}
-
-	local filter_items = {
-		["Dark Filter"] = 1,
-		["Darker Filter"] = 2,
-		["Darkest Filter"] = 3,
-	}
-
-	local highest_speed_val = 0
-	local highest_filter_val = 0
-
-	if AP.AP_AllReceivedItems then
-		for _, item in ipairs(AP.AP_AllReceivedItems) do
-			local name = AP.itemNames[item.item]
-			if name then
-				if name == "Bonus Percentage" then
-					bonus_count = bonus_count + 1
-				elseif speed_items[name] then
-					if speed_items[name] > highest_speed_val then
-						highest_speed_val = speed_items[name]
-						if name == "Speed Any BPM" then
-							max_bpm = "Unlimited"
-						else
-							max_bpm = name:gsub("Speed ", ""):upper()
-						end
-					end
-				elseif filter_items[name] then
-					if filter_items[name] > highest_filter_val then
-						highest_filter_val = filter_items[name]
-						max_filter = name:gsub(" Filter", "")
-					end
-				end
-			end
-		end
-	end
-
-	return max_bpm, max_filter, bonus_count
-end
 
 AP.MakeStatusOverlayActor = function()
 	local status_overlay_actor = nil
@@ -292,12 +198,12 @@ AP.MakeStatusOverlayActor = function()
 		bar_fg:zoomto(500 * progress_pct, 12)
 		
 		-- Update modifier stats line
-		local max_bpm, max_filter, bonus_count = getModifierStats()
+		local max_bpm, max_filter, bonus_count = AP.GetModifierStats()
 		local mod_text = string.format("Max Speed: %s    |    BG Filter: %s    |    Bonus Percentage Items: %d", max_bpm, max_filter, bonus_count)
 		container:GetChild("ConnectedGroup"):GetChild("ModifierText"):settext(mod_text)
 		
 		-- Update scrollable songs list rows
-		local songs = getUnlockedSongs()
+		local songs = AP.GetUnlockedSongs()
 		local list_af = container:GetChild("ConnectedGroup"):GetChild("SongList")
 		
 		for i = 1, 10 do
@@ -305,7 +211,7 @@ AP.MakeStatusOverlayActor = function()
 			local idx = scrollOffset + i - 1
 			if idx <= #songs then
 				local song_name = songs[idx]
-				local comp, tot = getChecksForSong(song_name)
+				local comp, tot = AP.GetChecksForSong(song_name)
 				
 				-- Trim filename to show only the folder path
 				local display_name = song_name:match("^(.-)/[^/]+$") or song_name
@@ -406,7 +312,7 @@ AP.MakeStatusOverlayActor = function()
 		local key = event.DeviceInput.button
 		local game_btn = event.GameButton
 		
-		local songs = getUnlockedSongs()
+		local songs = AP.GetUnlockedSongs()
 		local num_songs = #songs
 		
 		if game_btn == "MenuDown" or key == "DeviceButton_down" then
@@ -759,38 +665,3 @@ AP.MakeStatusOverlayActor = function()
 	return af
 end
 
-AP.MakeScreenActor = function(screenName)
-	local af = Def.ActorFrame {
-		AP.MakePopupActor(screenName),
-	}
-	
-	if screenName == "ScreenSelectMusic" then
-		-- Small helper text in the footer: "Press F10 for AP Status"
-		af[#af+1] = LoadFont("Common Normal") .. {
-			Name = "APStatusHelperText",
-			Text = "Press F10 for AP Status",
-			InitCommand = function(self)
-				self:xy(_screen.cx + SL_WideScale(138, 191), _screen.h - 9)
-				self:zoom(SL_WideScale(0.8, 0.9))
-				self:diffusealpha(0)
-				self:halign(0.5):valign(1)
-			end,
-			ModuleCommand = function(self)
-				self:stoptweening()
-				self:diffusealpha(0):sleep(0.1):decelerate(0.33):diffusealpha(1)
-			end
-		}
-		
-		af[#af+1] = AP.MakeStatusOverlayActor()
-	end
-	
-	if screenName:find("ScreenEvaluation") then
-		af[#af+1] = Def.Actor {
-			ModuleCommand = function(self)
-				AP.EvaluateCompletedSong()
-			end
-		}
-	end
-	
-	return af
-end
