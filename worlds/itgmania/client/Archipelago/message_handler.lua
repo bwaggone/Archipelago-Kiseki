@@ -95,23 +95,43 @@ AP.HandleMessage = function(self, msg)
 				AP.initialSyncComplete = false
 				AP.AP_SM("Successfully connected to Archipelago! Slot: " .. tostring(packet.slot))
 				MESSAGEMAN:Broadcast("APItemNotification", { type = "Connected", name = packet.slot })
+				
+				AP.checkedLocations = {}
+				if packet["checked_locations"] then
+					for _, loc_id in ipairs(packet["checked_locations"]) do
+						AP.checkedLocations[loc_id] = true
+					end
+				end
+				
 				if packet["slot_data"] then
 					AP.slotOptions.score_type = packet["slot_data"]["score_type"] or 1
 					AP.slotOptions.passing_score = packet["slot_data"]["passing_score"] or 0
 					AP.slotOptions.fail_allowed = packet["slot_data"]["fail_allowed"]
+					AP.slotOptions.win_count = packet["slot_data"]["win_count"] or 15
 					AP.AP_SM("Slot Options - Score Type: " .. tostring(AP.slotOptions.score_type) .. 
 					   ", Passing Score: " .. tostring(AP.slotOptions.passing_score) .. 
-					   ", Fail Allowed: " .. tostring(AP.slotOptions.fail_allowed))
+					   ", Fail Allowed: " .. tostring(AP.slotOptions.fail_allowed) ..
+					   ", Win Count: " .. tostring(AP.slotOptions.win_count))
 				end
 			elseif packet_cmd == "RoomUpdate" then
 				AP.AP_SM("Received RoomUpdate from server.")
+				
+				if packet["checked_locations"] then
+					if not AP.checkedLocations then AP.checkedLocations = {} end
+					for _, loc_id in ipairs(packet["checked_locations"]) do
+						AP.checkedLocations[loc_id] = true
+					end
+				end
+				
 				if packet["slot_data"] then
 					AP.slotOptions.score_type = packet["slot_data"]["score_type"] or AP.slotOptions.score_type
 					AP.slotOptions.passing_score = packet["slot_data"]["passing_score"] or AP.slotOptions.passing_score
 					AP.slotOptions.fail_allowed = packet["slot_data"]["fail_allowed"] or AP.slotOptions.fail_allowed
+					AP.slotOptions.win_count = packet["slot_data"]["win_count"] or AP.slotOptions.win_count
 					AP.AP_SM("Updated Slot Options - Score Type: " .. tostring(AP.slotOptions.score_type) .. 
 					   ", Passing Score: " .. tostring(AP.slotOptions.passing_score) .. 
-					   ", Fail Allowed: " .. tostring(AP.slotOptions.fail_allowed))
+					   ", Fail Allowed: " .. tostring(AP.slotOptions.fail_allowed) ..
+					   ", Win Count: " .. tostring(AP.slotOptions.win_count))
 				end
 			elseif packet_cmd == "ConnectionRefused" then
 				self.connected = false
