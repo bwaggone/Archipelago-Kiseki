@@ -237,10 +237,11 @@ end
 AP.MakeStatusOverlayActor = function()
 	local status_overlay_actor = nil
 	local scrollOffset = 1
+	local selectedIndex = 1
 	local overlay_visible = false
 	local inputCallback = nil
 	
-	local paneWidth = 580
+	local paneWidth = 720
 	local paneHeight = 440
 	local RowHeight = 26
 	
@@ -311,6 +312,15 @@ AP.MakeStatusOverlayActor = function()
 				row:GetChild("Name"):settext(idx .. ". " .. display_name)
 				row:GetChild("Checks"):settext(string.format("[ %d / %d ]", comp, tot))
 				
+				-- Show/hide selection highlight
+				if idx == selectedIndex then
+					row:GetChild("Highlight"):visible(true)
+					row:GetChild("Name"):diffuse(0.3, 0.9, 0.9, 1) -- highlighted cyan
+				else
+					row:GetChild("Highlight"):visible(false)
+					row:GetChild("Name"):diffuse(1.0, 1.0, 1.0, 1) -- normal white
+				end
+				
 				-- Diffuse color based on completion percentage (green if finished)
 				if comp == tot and tot > 0 then
 					row:GetChild("Checks"):diffuse(0.3, 1.0, 0.3, 1) -- completed green
@@ -321,6 +331,63 @@ AP.MakeStatusOverlayActor = function()
 			else
 				row:visible(false)
 			end
+		end
+		
+		-- Update details panel for the selected song
+		local detail_panel = container:GetChild("ConnectedGroup"):GetChild("DetailPanel")
+		if selectedIndex <= #songs then
+			local song_name = songs[selectedIndex]
+			
+			local score_type_names = {
+				[0] = "Money",
+				[1] = "EX",
+				[2] = "High EX"
+			}
+			local score_name = score_type_names[AP.slotOptions.score_type] or "EX"
+			local passing_score = AP.slotOptions.passing_score or 0
+			local fail_str = AP.slotOptions.fail_allowed and " (Fail OK)" or " (No Fail)"
+			local clear_cond_str = string.format("Clear Condition: Minimum %.0f%% %s%s", passing_score, score_name, fail_str)
+			detail_panel:GetChild("ClearCondition"):settext(clear_cond_str):zoom(0.75)
+			
+			local suffixes = { "0", "1", "85", "90", "96", "98", "99", "quad", "quint" }
+			local labels = {
+				["0"] = "Clear Check 1",
+				["1"] = "Clear Check 2",
+				["85"] = "85% Score Check",
+				["90"] = "90% Score Check",
+				["96"] = "96% Score Check",
+				["98"] = "98% Score Check",
+				["99"] = "99% Score Check",
+				["quad"] = "Quad (100% Money)",
+				["quint"] = "Quint (100% EX)"
+			}
+			
+			for _, suffix in ipairs(suffixes) do
+				local label = labels[suffix]
+				local loc_name = song_name .. "-" .. suffix
+				local loc_id = AP.locationIds[loc_name]
+				local row_actor = detail_panel:GetChild("Check" .. suffix)
+				
+				if not loc_id or not AP.activeLocationIds[loc_id] then
+					-- Inactive check
+					row_actor:settext("[-] " .. label .. " (N/A)")
+					row_actor:diffuse(0.6, 0.6, 0.6, 0.7) -- lighter readable grey
+				else
+					-- Active check
+					if AP.checkedLocations and AP.checkedLocations[loc_id] then
+						-- Checked
+						row_actor:settext("[x] " .. label)
+						row_actor:diffuse(0.3, 1.0, 0.3, 1) -- green
+					else
+						-- Unchecked
+						row_actor:settext("[ ] " .. label)
+						row_actor:diffuse(1.0, 1.0, 1.0, 1) -- white
+					end
+				end
+			end
+			detail_panel:visible(true)
+		else
+			detail_panel:visible(false)
 		end
 	end
 
@@ -344,15 +411,21 @@ AP.MakeStatusOverlayActor = function()
 		
 		if game_btn == "MenuDown" or key == "DeviceButton_down" then
 			-- Scroll down
-			if num_songs > 10 then
-				scrollOffset = math.min(scrollOffset + 1, num_songs - 10 + 1)
+			if selectedIndex < num_songs then
+				selectedIndex = selectedIndex + 1
+				if selectedIndex > scrollOffset + 9 then
+					scrollOffset = selectedIndex - 9
+				end
 				SOUND:PlayOnce(THEME:GetPathS("ScreenSelectMaster", "change"))
 				MESSAGEMAN:Broadcast("APStatusRefresh")
 			end
 		elseif game_btn == "MenuUp" or key == "DeviceButton_up" then
 			-- Scroll up
-			if scrollOffset > 1 then
-				scrollOffset = math.max(1, scrollOffset - 1)
+			if selectedIndex > 1 then
+				selectedIndex = selectedIndex - 1
+				if selectedIndex < scrollOffset then
+					scrollOffset = selectedIndex
+				end
 				SOUND:PlayOnce(THEME:GetPathS("ScreenSelectMaster", "change"))
 				MESSAGEMAN:Broadcast("APStatusRefresh")
 			end
@@ -380,6 +453,7 @@ AP.MakeStatusOverlayActor = function()
 	local function toggleOverlay(self)
 		overlay_visible = not overlay_visible
 		scrollOffset = 1
+		selectedIndex = 1
 		
 		local screen = SCREENMAN:GetTopScreen()
 		if overlay_visible then
@@ -421,15 +495,24 @@ AP.MakeStatusOverlayActor = function()
 		song_list_children[#song_list_children+1] = Def.ActorFrame {
 			Name = "Row" .. i,
 			InitCommand = function(self)
-				self:y((i - 1) * RowHeight - 65)
+				self:y((i - 1) * RowHeight - 52)
 			end,
+			
+			-- Highlight background quad (only visible on selected row)
+			Def.Quad {
+				Name = "Highlight",
+				InitCommand = function(self)
+					self:zoomto(400, RowHeight):diffuse(0.2, 0.2, 0.2, 0.5):visible(false)
+					self:x(-130)
+				end
+			},
 			
 			-- Left column: Song Folder name
 			LoadFont("Common Normal") .. {
 				Name = "Name",
 				Text = "",
 				InitCommand = function(self)
-					self:x(-paneWidth/2 + 30):halign(0):zoom(0.5):maxwidth(420)
+					self:x(-paneWidth/2 + 30):halign(0):zoom(0.5):maxwidth(320)
 				end
 			},
 			-- Right column: Completion status counters
@@ -437,7 +520,7 @@ AP.MakeStatusOverlayActor = function()
 				Name = "Checks",
 				Text = "",
 				InitCommand = function(self)
-					self:x(paneWidth/2 - 30):halign(1):zoom(0.5)
+					self:x(paneWidth/2 - 280):halign(1):zoom(0.5)
 				end
 			}
 		}
@@ -449,6 +532,7 @@ AP.MakeStatusOverlayActor = function()
 			status_overlay_actor = self
 			overlay_visible = false
 			scrollOffset = 1
+			selectedIndex = 1
 		end,
 		ModuleCommand = function(self)
 			local screen = SCREENMAN:GetTopScreen()
@@ -605,19 +689,59 @@ AP.MakeStatusOverlayActor = function()
 					end
 				},
 				
-				-- Left column header (Unlocked Song / Chart)
+				-- Left column header (SONG / CHART)
 				LoadFont("Common Bold") .. {
-					Text = "Unlocked Song / Chart",
+					Text = "SONG / CHART",
 					InitCommand = function(self)
 						self:y(-74):x(-paneWidth/2 + 30):halign(0):zoom(0.5):diffuse(0.6, 0.6, 0.6, 1)
 					end
 				},
-				-- Right column header (Checks Completed)
+				-- Right column header (CHECKS)
 				LoadFont("Common Bold") .. {
-					Text = "Checks Completed",
+					Text = "CHECKS",
 					InitCommand = function(self)
-						self:y(-74):x(paneWidth/2 - 30):halign(1):zoom(0.5):diffuse(0.6, 0.6, 0.6, 1)
+						self:y(-74):x(paneWidth/2 - 280):halign(1):zoom(0.5):diffuse(0.6, 0.6, 0.6, 1)
 					end
+				},
+				
+				-- Divider vertical line between left list and right details panel
+				Def.Quad {
+					InitCommand = function(self)
+						self:x(90):y(55):zoomto(2, 250):diffuse(0.4, 0.4, 0.4, 1)
+					end
+				},
+				
+				-- Right details panel actors
+				Def.ActorFrame {
+					Name = "DetailPanel",
+					InitCommand = function(self)
+						self:x(220)
+					end,
+					
+					LoadFont("Common Bold") .. {
+						Text = "CHECK DETAILS",
+						InitCommand = function(self)
+							self:y(-74):halign(0):x(-100):zoom(0.5):diffuse(0.3, 0.9, 0.9, 1)
+						end
+					},
+					
+					LoadFont("Common Normal") .. {
+						Name = "ClearCondition",
+						Text = "",
+						InitCommand = function(self)
+							self:y(-48):halign(0):x(-100):zoom(0.42):maxwidth(220):diffuse(0.9, 0.9, 0.4, 1)
+						end
+					},
+					
+					LoadFont("Common Normal") .. { Name = "Check0", Text = "", InitCommand = function(self) self:y(-22):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Check1", Text = "", InitCommand = function(self) self:y(0):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Check85", Text = "", InitCommand = function(self) self:y(22):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Check90", Text = "", InitCommand = function(self) self:y(44):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Check96", Text = "", InitCommand = function(self) self:y(66):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Check98", Text = "", InitCommand = function(self) self:y(88):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Check99", Text = "", InitCommand = function(self) self:y(110):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Checkquad", Text = "", InitCommand = function(self) self:y(132):halign(0):x(-100):zoom(0.45) end },
+					LoadFont("Common Normal") .. { Name = "Checkquint", Text = "", InitCommand = function(self) self:y(154):halign(0):x(-100):zoom(0.45) end },
 				},
 				
 				-- ActorFrame holding the list of scrollable song rows

@@ -1,3 +1,6 @@
+-- actor_handler.lua is our main init of the apHandler. It handles the initial
+-- websocket startup as well.
+
 local AP = ...
 
 AP.CreateAPHandler = function() 
@@ -18,6 +21,7 @@ AP.CreateAPHandler = function()
 				url=AP.HOST,
 				pingInterval=15,
 				automaticReconnect=true,
+				enableDeflate=true,
 				onMessage=function(msg)
 					AP.HandleMessage(self, msg)
 				end
