@@ -97,9 +97,16 @@ AP.HandleMessage = function(self, msg)
 				MESSAGEMAN:Broadcast("APItemNotification", { type = "Connected", name = packet.slot })
 				
 				AP.checkedLocations = {}
+				AP.activeLocationIds = {}
 				if packet["checked_locations"] then
 					for _, loc_id in ipairs(packet["checked_locations"]) do
 						AP.checkedLocations[loc_id] = true
+						AP.activeLocationIds[loc_id] = true
+					end
+				end
+				if packet["missing_locations"] then
+					for _, loc_id in ipairs(packet["missing_locations"]) do
+						AP.activeLocationIds[loc_id] = true
 					end
 				end
 				
@@ -118,8 +125,10 @@ AP.HandleMessage = function(self, msg)
 				
 				if packet["checked_locations"] then
 					if not AP.checkedLocations then AP.checkedLocations = {} end
+					if not AP.activeLocationIds then AP.activeLocationIds = {} end
 					for _, loc_id in ipairs(packet["checked_locations"]) do
 						AP.checkedLocations[loc_id] = true
+						AP.activeLocationIds[loc_id] = true
 					end
 				end
 				

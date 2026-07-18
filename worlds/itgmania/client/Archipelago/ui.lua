@@ -122,18 +122,19 @@ local function getUnlockedSongs()
 	return songs
 end
 
--- Helper to count checks (completed and total) for a specific chart name.
--- Iterates over all possible locations in the DataPackage matching "chart_name .. '-'"
--- and cross-references them with the cached checked locations.
 local function getChecksForSong(chart_name)
 	local total = 0
 	local completed = 0
 	if AP.locationIds then
 		for name, id in pairs(AP.locationIds) do
 			if name:sub(1, #chart_name + 1) == chart_name .. "-" then
-				total = total + 1
-				if AP.checkedLocations and AP.checkedLocations[id] then
-					completed = completed + 1
+				-- If activeLocationIds is populated, only count active locations.
+				-- Otherwise, fall back to counting all defined locations.
+				if not AP.activeLocationIds or AP.activeLocationIds[id] then
+					total = total + 1
+					if AP.checkedLocations and AP.checkedLocations[id] then
+						completed = completed + 1
+					end
 				end
 			end
 		end
@@ -232,17 +233,21 @@ AP.MakeStatusOverlayActor = function()
 		local seed_str = "Seed: " .. tostring(AP.seedName)
 		container:GetChild("ConnectedGroup"):GetChild("RoomSeedText"):settext(room_str .. "    |    " .. seed_str)
 		
-		-- Update goal progress numbers
-		local completed_checks = 0
-		if AP.checkedLocations then
-			for _ in pairs(AP.checkedLocations) do
-				completed_checks = completed_checks + 1
+		-- Update goal progress numbers: count unique song clears by checking how many songs have their "-0" check completed
+		local completed_clears = 0
+		if AP.locationIds and AP.activeLocationIds then
+			for name, id in pairs(AP.locationIds) do
+				if name:match("%-0$") and AP.activeLocationIds[id] then
+					if AP.checkedLocations and AP.checkedLocations[id] then
+						completed_clears = completed_clears + 1
+					end
+				end
 			end
 		end
-		local target_checks = AP.slotOptions.win_count or 15
-		local progress_pct = math.min(1.0, completed_checks / math.max(1, target_checks))
+		local target_clears = AP.slotOptions.win_count or 15
+		local progress_pct = math.min(1.0, completed_clears / math.max(1, target_clears))
 		
-		local progress_text = string.format("AP Goal Progress: %d / %d checks (%.1f%%)", completed_checks, target_checks, progress_pct * 100)
+		local progress_text = string.format("AP Goal Progress: %d / %d clears (%.1f%%)", completed_clears, target_clears, progress_pct * 100)
 		container:GetChild("ConnectedGroup"):GetChild("ProgressText"):settext(progress_text)
 		
 		-- Update progress bar quad width
