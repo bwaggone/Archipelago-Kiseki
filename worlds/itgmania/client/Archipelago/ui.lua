@@ -641,15 +641,15 @@ AP.MakeScreenActor = function(screenName)
 	}
 	
 	if screenName == "ScreenSelectMusic" then
-		-- Small helper text in the header: "Press F10 for AP Status"
-		af[#af+1] = LoadFont("Common Header") .. {
+		-- Small helper text in the footer: "Press F10 for AP Status"
+		af[#af+1] = LoadFont("Common Normal") .. {
 			Name = "APStatusHelperText",
 			Text = "Press F10 for AP Status",
 			InitCommand = function(self)
-				self:xy(_screen.w - SL_WideScale(205, 245), 15)
-				self:zoom(SL_WideScale(0.4, 0.46))
+				self:xy(_screen.cx + SL_WideScale(138, 191), _screen.h - 9)
+				self:zoom(SL_WideScale(0.8, 0.9))
 				self:diffusealpha(0)
-				self:halign(0.5):valign(0.5)
+				self:halign(0.5):valign(1)
 			end,
 			ModuleCommand = function(self)
 				self:stoptweening()
