@@ -4,8 +4,20 @@ ITGMania is a rhythm game engine. This guide explains how to set up ITGMania to 
 
 ## Installation
 
-1. Install the `itgmania.apworld` file into your Archipelago `worlds` directory.
-2. Install the ITGMania Archipelago client/mod into your ITGMania installation.
+1. Decide and populate your song pool. There will be a module provided that can
+   dump your song pool on ITGMania startup. From there, filter the song pool by
+   simply removing lines.
+2. Place the songs.csv file within the itgmania world directory in the server,
+   then you may proceed with world generation.
+3. If multiple players have different song pools, then append each CSV file
+   with the name of the player so that seed generation can select the
+   appropriate song pool per person.
+4. Copy the ITGMania Archipelago client into your ITGMania / Simply Love installation.
+   * This can be done by simply copying the contents of the "client" dir into your "Simply Love/Modules" directory.
+   * At the top of the Modules/archipelago.lua file is a place for the host address, username and password. Place
+	 your own values in there.
+   * No changes are needed to the ITGMania install or the theme. Though if you're using a fork of Simply Love (Zmod,
+	 Arrow Cloud, DigitalDance), then some UI elements may not display properly.
 
 ## Options
 
@@ -16,4 +28,11 @@ ITGMania is a rhythm game engine. This guide explains how to set up ITGMania to 
 - **Fail Allowed**: If enabled, failing a song counts as a pass (if immediate continue is enabled in ITGMania).
 - **Passing Score**: Desired score type grade threshold to clear a chart.
 - **Score Type**: Grade type to evaluate (EX, High EX, etc.).
-- **Song Folders**: Comma-separated list of folders inside your `/Songs` directory to restrict the randomizer to.
+
+## Usage in-game and features
+
+-- Automatic playlist generation for the seed: The module will update and reload the
+   song wheel when new charts are recieved
+-- In-game AP tracking: Press F10 from the songwheel to see the current AP game status.
+-- Pop-up notifications: In relevants screens, you will see pop-ups when items
+   are sent and received.

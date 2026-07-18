@@ -96,7 +96,6 @@ AP.apHandler:InitCommand()
 local screens = {
 	"ScreenTitleMenu",
 	"ScreenSelectMusic",
-	"ScreenGameplay",
 	"ScreenEvaluationNormal",
 	"ScreenEvaluationStage",
 	"ScreenEvaluationNonstop"
