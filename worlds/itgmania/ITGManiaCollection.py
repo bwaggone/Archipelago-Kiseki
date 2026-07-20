@@ -12,7 +12,7 @@ class ITGManiaCollections:
     song_locations: Dict[str, int] = {}
 
     filler_items: Dict[str, int] = {
-        "Bonus Percentage": STARTING_CODE + 20000,
+        "Score Booster": STARTING_CODE + 20000,
     }
 
     mod_items: Dict[str, int] = {
@@ -35,7 +35,7 @@ class ITGManiaCollections:
     }
 
     filler_item_weights: Dict[str, int] = {
-        "Bonus Percentage": 1,
+        "Score Booster": 1,
     }
 
     item_names_to_id: ChainMap = ChainMap(

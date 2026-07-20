@@ -64,6 +64,7 @@ AP.MakeScreenActor = function(screenName)
 				AP.EvaluateCompletedSong()
 			end
 		}
+		af[#af+1] = AP.MakeEvaluationOverlayActor()
 	end
 	
 	return af

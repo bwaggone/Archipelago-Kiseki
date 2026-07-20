@@ -26,14 +26,16 @@ AP.EvaluateCompletedSong = function()
 	
 	AP.AP_SM("Evaluating completed AP song: " .. chart_name)
 	
-	local checks_to_send = {}
-	local queue_check = function(suffix)
-		local loc_name = chart_name .. "-" .. suffix
-		local loc_id = AP.locationIds[loc_name]
-		if loc_id then
-			table.insert(checks_to_send, loc_id)
-		end
+	-- Reset bonus usage for this song on a new completion/replay (fresh slate)
+	if AP.bonusUsage then
+		AP.bonusUsage[chart_name] = nil
+		AP.SaveBonusUsage()
 	end
+	
+	AP.LastEvaluation = {
+		chart_name = chart_name,
+		players = {}
+	}
 	
 	for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
 		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(pn)
@@ -65,54 +67,42 @@ AP.EvaluateCompletedSong = function()
 				score_system_name = "High EX (FA+)"
 			end
 			
-			AP.AP_SM("Player " .. ToEnumShortString(pn) .. " Performance - " .. score_system_name .. " Score: " .. string.format("%.2f", activePercent) .. "% (Money: " .. string.format("%.2f", moneyPercent) .. "%" .. (CalculateExScore and (", EX: " .. string.format("%.2f", exPercent) .. "%") or "") .. "), Failed: " .. tostring(is_failed))
-			
-			-- Check clear condition
-			local fail_allowed = (AP.slotOptions.fail_allowed == true or AP.slotOptions.fail_allowed == 1)
-			local passed_clear = false
-			if not is_failed or fail_allowed then
-				if activePercent >= AP.slotOptions.passing_score then
-					passed_clear = true
+			local usage = AP.bonusUsage and AP.bonusUsage[chart_name]
+			local bonus_applied = 0
+			if usage then
+				if type(usage) == "table" then
+					if AP.slotOptions.score_type == 0 then
+						bonus_applied = usage.money or 0
+					elseif AP.slotOptions.score_type == 2 then
+						bonus_applied = usage.hex or 0
+					else
+						bonus_applied = usage.ex or 0
+					end
+				else
+					bonus_applied = usage
 				end
 			end
+			local adjustedPercent = activePercent + (bonus_applied * 0.25)
 			
-			if passed_clear then
-				AP.AP_SM("Player " .. ToEnumShortString(pn) .. " CLEARED the song logic!")
-				queue_check("0")
-				queue_check("1")
-				
-				-- Check score thresholds
-				if activePercent >= 85 then queue_check("85") end
-				if activePercent >= 90 then queue_check("90") end
-				if activePercent >= 96 then queue_check("96") end
-				if activePercent >= 98 then queue_check("98") end
-				if activePercent >= 99 then queue_check("99") end
-			else
-				AP.AP_SM("Player " .. ToEnumShortString(pn) .. " did not clear the song logic (Passing Score target: " .. tostring(AP.slotOptions.passing_score) .. "%)")
-			end
+			AP.AP_SM("Player " .. ToEnumShortString(pn) .. " Performance - " .. score_system_name .. " Score: " .. string.format("%.2f", activePercent) .. "% (Money: " .. string.format("%.2f", moneyPercent) .. "%" .. (CalculateExScore and (", EX: " .. string.format("%.2f", exPercent) .. "%") or "") .. "), Failed: " .. tostring(is_failed))
 			
-			-- Quad and Quint are independent of the selected score_type
-			if moneyPercent >= 100 then
-				AP.AP_SM("Player " .. ToEnumShortString(pn) .. " got a QUAD money score!")
-				queue_check("quad")
-			end
-			if exPercent >= 100 and CalculateExScore then
-				AP.AP_SM("Player " .. ToEnumShortString(pn) .. " got a QUINT EX score!")
-				queue_check("quint")
-			end
+			-- Cache player stats for the score adjuster overlay
+			AP.LastEvaluation.players[pn] = {
+				is_failed = is_failed,
+				moneyPercent = moneyPercent,
+				exPercent = exPercent,
+				highExPercent = highExPercent,
+				activePercent = activePercent,
+				adjustedPercent = adjustedPercent,
+				score_system_name = score_system_name,
+			}
 		end
 	end
 	
-	if #checks_to_send > 0 and AP.apHandlerInstance and AP.apHandlerInstance.connected and AP.apHandlerInstance.socket then
-		AP.AP_SM("Sending " .. tostring(#checks_to_send) .. " location checks to server...")
-		local checks_packet = {
-			["cmd"] = "LocationChecks",
-			locations = checks_to_send
-		}
-		local payload = JsonEncode({ checks_packet })
-		AP.apHandlerInstance.socket:Send(payload, false)
-		MESSAGEMAN:Broadcast("APItemNotification", { type = "Sent", name = chart_name })
-	else
-		AP.AP_SM("No locations to check or client is not connected.")
+	-- If the player has no available bonus items, finalize and send checks immediately.
+	-- Otherwise, let them decide via the auto-popup overlay before finalizing.
+	local available = AP.GetAvailableBonusItems()
+	if available == 0 then
+		AP.FinalizeEvaluationAndSendChecks()
 	end
 end

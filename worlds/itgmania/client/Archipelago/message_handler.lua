@@ -99,6 +99,8 @@ AP.HandleMessage = function(self, msg)
 				self.connected = true
 				AP.initialSyncComplete = false
 				AP.connectedSlotName = packet.slot
+				AP.SLOT = packet.slot
+				AP.LoadBonusUsage()
 				AP.AP_SM("Successfully connected to Archipelago! Slot: " .. tostring(packet.slot))
 				
 				AP.checkedLocations = {}

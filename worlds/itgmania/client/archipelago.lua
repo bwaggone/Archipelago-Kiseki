@@ -19,6 +19,7 @@ AP.locationIds = {}
 AP.folderToChartName = {}
 AP.seedName = "Unknown"
 AP.AP_AllReceivedItems = {}
+AP.bonusUsage = {}
 AP.initialSyncComplete = false
 AP.hasShownConnectedPopup = false
 AP.slotOptions = {
@@ -83,6 +84,7 @@ end
 -- Load Archipelago components
 loadSubFile("helpers.lua")
 loadSubFile("playlist.lua")
+loadSubFile("item_handler.lua")
 loadSubFile("evaluator.lua")
 loadSubFile("message_handler.lua")
 loadSubFile("actor_handler.lua")

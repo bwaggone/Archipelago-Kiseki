@@ -66,9 +66,9 @@ end
 -- Traverses received items to determine:
 -- 1. Highest BPM speed limit modifier item (e.g. "Speed 550bpm")
 -- 2. Darkest background filter modifier item (e.g. "Darker Filter")
--- 3. Number of "Bonus Percentage" items received
+-- 3. Number of "Score Booster" items received
 AP.GetModifierStats = function()
-	local max_bpm = "250 BPM"
+	local max_bpm = "Default (300)"
 	local max_filter = "None"
 	local bonus_count = 0
 
@@ -94,7 +94,7 @@ AP.GetModifierStats = function()
 		for _, item in ipairs(AP.AP_AllReceivedItems) do
 			local name = AP.itemNames[item.item]
 			if name then
-				if name == "Bonus Percentage" then
+				if name == "Score Booster" then
 					bonus_count = bonus_count + 1
 				elseif speed_items[name] then
 					if speed_items[name] > highest_speed_val then
