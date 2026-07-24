@@ -12,12 +12,8 @@ ITGMania is a rhythm game engine. This guide explains how to set up ITGMania to 
 3. If multiple players have different song pools, then append each CSV file
    with the name of the player so that seed generation can select the
    appropriate song pool per person.
-4. Copy the ITGMania Archipelago client into your ITGMania / Simply Love installation.
-   * This can be done by simply copying the contents of the "client" dir into your "Simply Love/Modules" directory.
-   * At the top of the Modules/archipelago.lua file is a place for the host address, username and password. Place
-	 your own values in there.
-   * No changes are needed to the ITGMania install or the theme. Though if you're using a fork of Simply Love (Zmod,
-	 Arrow Cloud, DigitalDance), then some UI elements may not display properly.
+4. Visit the [Archipelago Client](https://github.com/bwaggone/ITGMania-Archipelago-Module) github page and follow the instructions
+   to install the module within your ITGMania install.
 
 ## Options
 
