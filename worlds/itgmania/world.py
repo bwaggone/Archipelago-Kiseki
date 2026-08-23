@@ -145,6 +145,6 @@ class ITGMania(World):
         # If you need access to the player's chosen options on the client side, there is a helper for that.
         return self.options.as_dict(
             "fail_allowed", "passing_score", "score_type", "number_of_charts",
-            "number_of_starting_charts", "group_size", "win_count"
+            "number_of_starting_charts", "group_size", "win_count", "enable_mod_items"
         )
 
