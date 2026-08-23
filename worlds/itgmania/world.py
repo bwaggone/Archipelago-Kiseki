@@ -48,6 +48,14 @@ class ITGMania(World):
         from .items import get_song_data
         from Options import OptionError
 
+        trap_item_names = [name.strip() for name in self.options.trap_items.value if name.strip()]
+        invalid_trap = [name for name in trap_item_names if name not in self.itgm_collection.trap_items]
+        if invalid_trap:
+            raise OptionError(
+                f"{self.player_name}'s ITGMania Trap Items contains unrecognized name(s) "
+                f"{invalid_trap} - must be chosen from: {list(self.itgm_collection.trap_items.keys())}."
+            )
+
         available_charts = [c for c in get_song_data() if c.style == "Dance_Single"]
 
         num_charts = self.options.number_of_charts.value
@@ -143,8 +151,11 @@ class ITGMania(World):
     # slot_data is just a dictionary using basic types, that will be converted to json when sent to the client.
     def fill_slot_data(self) -> Mapping[str, Any]:
         # If you need access to the player's chosen options on the client side, there is a helper for that.
-        return self.options.as_dict(
+        slot_data = self.options.as_dict(
             "fail_allowed", "passing_score", "score_type", "number_of_charts",
             "number_of_starting_charts", "group_size", "win_count", "enable_mod_items"
         )
+        slot_data["deathlink_enabled"] = bool(self.options.death_link.value)
+        slot_data["trap_items"] = list(self.options.trap_items.value)
+        return slot_data
 

@@ -34,6 +34,13 @@ class ITGManiaCollections:
         "Darkest Filter": STARTING_CODE + 15015,
     }
 
+    trap_items: Dict[str, int] = {
+        "Trap - Reverse Scroll": STARTING_CODE + 16000,
+        "Trap - Mini": STARTING_CODE + 16001,
+        "Trap - Dark": STARTING_CODE + 16002,
+        "Trap - Half Speed": STARTING_CODE + 16003,
+    }
+
     filler_item_weights: Dict[str, int] = {
         "Score Booster": 1,
     }
@@ -41,7 +48,8 @@ class ITGManiaCollections:
     item_names_to_id: ChainMap = ChainMap(
         {c.name: 57300001 + i for i, c in enumerate(ALL_CHARTS)},
         filler_items,
-        mod_items
+        mod_items,
+        trap_items
     )
     location_names_to_id: ChainMap = ChainMap(song_locations)
 

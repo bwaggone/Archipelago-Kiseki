@@ -53,6 +53,10 @@ def create_item(world: ITGMania, name: str) -> ITGManiaItem:
         classification = ItemClassification.filler if "Mirror" in name else ItemClassification.useful
         return ITGManiaItem(name, classification, mod_item, world.player)
 
+    trap_item = world.itgm_collection.trap_items.get(name)
+    if trap_item:
+        return ITGManiaItem(name, ItemClassification.trap, trap_item, world.player)
+
     filler = world.itgm_collection.filler_items.get(name)
     if filler:
         return ITGManiaItem(name, ItemClassification.filler, filler, world.player)
@@ -92,12 +96,19 @@ def create_all_items(world: ITGMania) -> None:
         for mod_name in world.itgm_collection.mod_items.keys():
             world.multiworld.itempool.append(create_item(world, mod_name))
 
-    # 3. Fill the remaining spots with filler items
+    # 3. Fill the remaining spots with filler items or traps
     item_count = len(world.included_songs)
     if world.options.enable_mod_items:
         item_count += len(world.itgm_collection.mod_items)
         
     items_left = location_count - item_count
 
+    trap_item_names = [name.strip() for name in world.options.trap_items.value if name.strip()]
+    trap_chance = world.options.trap_chance.value if trap_item_names else 0
+
     for _ in range(max(0, items_left)):
-        world.multiworld.itempool.append(create_item(world, world.get_filler_item_name()))
+        if trap_item_names and world.random.randint(1, 100) <= trap_chance:
+            item_name = world.random.choice(trap_item_names)
+        else:
+            item_name = world.get_filler_item_name()
+        world.multiworld.itempool.append(create_item(world, item_name))

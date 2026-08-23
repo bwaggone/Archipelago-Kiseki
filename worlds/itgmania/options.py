@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from Options import Choice, OptionGroup, PerGameCommonOptions, Range, Toggle, FreeText
+from Options import Choice, OptionGroup, PerGameCommonOptions, Range, Toggle, FreeText, OptionList, DeathLink, DeathLinkMixin
 
 # In this file, we define the options the player can pick.
 # The most common types of options are Toggle, Range and Choice.
@@ -117,9 +117,28 @@ class EnableModItems(Toggle):
     """Enable speed mods and appearance mods as items in the pool."""
     display_name = "Enable Mod Items"
 
+class TrapItems(OptionList):
+    """Flavor names for Trap items other players can send you - these have a real effect in-game
+    (applied to your NEXT song, not mid-song - see the setup guide for details).
+    Must be chosen from this fixed list:
+        Trap - Reverse Scroll, Trap - Dark, Trap - Half Speed, Trap - Mini
+    Leave empty to disable traps entirely.
+    """
+    display_name = "Trap Items"
+    default = []
+
+class TrapChance(Range):
+    """Of your junk item pool, what percent should be Traps instead of plain Filler?
+    Has no effect if Trap Items is empty.
+    """
+    display_name = "Trap Chance"
+    range_start = 0
+    range_end = 100
+    default = 0
+
 
 @dataclass
-class ITGManiaOptions(PerGameCommonOptions):
+class ITGManiaOptions(PerGameCommonOptions, DeathLinkMixin):
     fail_allowed: FailAllowed
     passing_score: PassingScore
     score_type: ScoreType
@@ -135,6 +154,9 @@ class ITGManiaOptions(PerGameCommonOptions):
     include_quad_score_checks: IncludeQuadScoreChecks
     include_quint_score_checks: IncludeQuintScoreChecks
     enable_mod_items: EnableModItems
+    trap_items: TrapItems
+    trap_chance: TrapChance
+    death_link: DeathLink
 
 
 # If we want to group our options by similar type, we can do so as well. This looks nice on the website.
@@ -153,6 +175,10 @@ option_groups = [
             Include85ScoreChecks, Include90ScoreChecks, Include96ScoreChecks,
             Include98ScoreChecks, Include99ScoreChecks, IncludeQuadScoreChecks, IncludeQuintScoreChecks
         ],
+    ),
+    OptionGroup(
+        "Traps & DeathLink",
+        [TrapItems, TrapChance, DeathLink],
     ),
 ]
 

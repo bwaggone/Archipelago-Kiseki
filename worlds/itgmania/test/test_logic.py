@@ -189,3 +189,32 @@ class TestITGManiaModItemsInvalid(unittest.TestCase):
         with self.assertRaises(OptionError):
             world.generate_early()
 
+
+class TestITGManiaTrapsAndDeathLink(ITGManiaTestBase):
+    options = {
+        "number_of_charts": 10,
+        "number_of_starting_charts": 2,
+        "group_size": 1,
+        "win_count": 5,
+        "trap_items": ["Trap - Reverse Scroll", "Trap - Dark"],
+        "trap_chance": 50,
+        "death_link": True,
+    }
+
+    def test_trap_items_in_pool(self) -> None:
+        from BaseClasses import ItemClassification
+        world = self.get_world()
+        itempool_names = [item.name for item in world.multiworld.itempool]
+
+        # Check classification of trap items in pool
+        for item in world.multiworld.itempool:
+            if item.name in world.itgm_collection.trap_items:
+                self.assertEqual(item.classification, ItemClassification.trap)
+
+    def test_slot_data_exports(self) -> None:
+        world = self.get_world()
+        slot_data = world.fill_slot_data()
+        self.assertTrue(slot_data["deathlink_enabled"])
+        self.assertIn("Trap - Reverse Scroll", slot_data["trap_items"])
+        self.assertIn("Trap - Dark", slot_data["trap_items"])
+
