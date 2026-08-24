@@ -21,7 +21,7 @@ class ITGManiaWebWorld(WebWorld):
         "English",
         "setup_en.md",
         "setup/en",
-        ["bwags"],
+        ["bwags", "HeeroJay"],
     )
 
     tutorials = [setup_en]
