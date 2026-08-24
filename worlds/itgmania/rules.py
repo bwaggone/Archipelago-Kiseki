@@ -47,11 +47,23 @@ def set_all_rules(world: ITGMania) -> None:
         for loc_name in loc_names:
             world.get_location(loc_name).access_rule = rule
 
-    # Completion condition: must be able to reach at least `win_count` locations (charts) in total.
-    def make_victory_rule(p: int, w: int, songs: list[str], suffixes: list[str]):
-        return lambda state: sum(
-            sum(1 if state.can_reach(f"{song}{suffix}", "Location", p) else 0 for suffix in suffixes)
-            for song in songs
-        ) >= w
+    if world.options.game_mode == 1:
+        from .options import BOSS_KEY_NAME_BY_KEY
+        bosskey_name = BOSS_KEY_NAME_BY_KEY[world.options.boss_key_name.current_key]
+        bosskeys_required = min(world.options.boss_keys_required.value, world.options.boss_key_count.value)
+        goal_rule = lambda state: state.has(bosskey_name, player, bosskeys_required)
+        
+        goal_loc_names = [f"{world.goal_song}{suffix}" for suffix in active_suffixes]
+        for loc_name in goal_loc_names:
+            world.get_location(loc_name).access_rule = goal_rule
 
-    world.multiworld.completion_condition[player] = make_victory_rule(player, win_count, all_selected_songs, active_suffixes)
+        world.multiworld.completion_condition[player] = lambda state: state.can_reach(f"{world.goal_song}-0", "Location", player)
+    else:
+        # Completion condition: must be able to reach at least `win_count` locations (charts) in total.
+        def make_victory_rule(p: int, w: int, songs: list[str], suffixes: list[str]):
+            return lambda state: sum(
+                sum(1 if state.can_reach(f"{song}{suffix}", "Location", p) else 0 for suffix in suffixes)
+                for song in songs
+            ) >= w
+
+        world.multiworld.completion_condition[player] = make_victory_rule(player, win_count, all_selected_songs, active_suffixes)

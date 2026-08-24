@@ -41,6 +41,16 @@ class ITGManiaCollections:
         "Trap - Half Speed": STARTING_CODE + 16003,
     }
 
+    bosskey_items: Dict[str, int] = {
+        "Boss Key": STARTING_CODE + 25000,
+        "Boss Song Fragment": STARTING_CODE + 25001,
+        "McGuffin": STARTING_CODE + 25002,
+        "Dice Fragment": STARTING_CODE + 25003,
+        "Golden Disc": STARTING_CODE + 25004,
+        "Ancient Relic": STARTING_CODE + 25005,
+        "Puzzle Piece": STARTING_CODE + 25006,
+    }
+
     filler_item_weights: Dict[str, int] = {
         "Score Booster": 1,
     }
@@ -49,7 +59,8 @@ class ITGManiaCollections:
         {c.name: 57300001 + i for i, c in enumerate(ALL_CHARTS)},
         filler_items,
         mod_items,
-        trap_items
+        trap_items,
+        bosskey_items
     )
     location_names_to_id: ChainMap = ChainMap(song_locations)
 

@@ -137,8 +137,73 @@ class TrapChance(Range):
     default = 0
 
 
+class GameMode(Choice):
+    """The game mode to play.
+    clear_count: Clear a specified number of songs to win the game.
+    boss_key: Unlocks and clear a specific Goal Song after collecting a target number of Boss Keys.
+    """
+    display_name = "Game Mode"
+    option_clear_count = 0
+    option_boss_key = 1
+    default = 0
+
+
+class GoalSong(FreeText):
+    """The exact song title (from songs.csv) that is your Goal Song.
+    Leave empty to randomly select one from your selected charts.
+    """
+    display_name = "Goal Song"
+    default = ""
+
+
+class BossKeyCount(Range):
+    """Total number of Boss Keys placed in the multiworld item pool."""
+    display_name = "Boss Key Count"
+    range_start = 1
+    range_end = 99
+    default = 10
+
+
+class BossKeysRequired(Range):
+    """How many Boss Keys you must collect before the Goal Song unlocks."""
+    display_name = "Boss Keys Required"
+    range_start = 1
+    range_end = 99
+    default = 8
+
+
+class BossKeyName(Choice):
+    """Flavor name for the Boss Key item - shown in Archipelago tracker and chat."""
+    display_name = "Boss Key Name"
+    option_boss_key = 0
+    option_boss_song_fragment = 1
+    option_mcguffin = 2
+    option_dice_fragment = 3
+    option_golden_disc = 4
+    option_ancient_relic = 5
+    option_puzzle_piece = 6
+    default = 0
+
+
+# Maps a BossKeyName Choice's current_key to the real display/item name used everywhere else.
+BOSS_KEY_NAME_BY_KEY = {
+    "boss_key": "Boss Key",
+    "boss_song_fragment": "Boss Song Fragment",
+    "mcguffin": "McGuffin",
+    "dice_fragment": "Dice Fragment",
+    "golden_disc": "Golden Disc",
+    "ancient_relic": "Ancient Relic",
+    "puzzle_piece": "Puzzle Piece",
+}
+
+
 @dataclass
 class ITGManiaOptions(PerGameCommonOptions, DeathLinkMixin):
+    game_mode: GameMode
+    goal_song: GoalSong
+    boss_key_count: BossKeyCount
+    boss_keys_required: BossKeysRequired
+    boss_key_name: BossKeyName
     fail_allowed: FailAllowed
     passing_score: PassingScore
     score_type: ScoreType
@@ -162,8 +227,16 @@ class ITGManiaOptions(PerGameCommonOptions, DeathLinkMixin):
 # If we want to group our options by similar type, we can do so as well. This looks nice on the website.
 option_groups = [
     OptionGroup(
-        "Completion Criteria",
-        [NumberOfStartingCharts, NumberOfCharts, PassingScore, GroupSize, WinCount],
+        "General Settings & Game Mode",
+        [GameMode, NumberOfStartingCharts, NumberOfCharts, PassingScore, GroupSize],
+    ),
+    OptionGroup(
+        "Clear Count Mode Options",
+        [WinCount],
+    ),
+    OptionGroup(
+        "Boss Key Mode Options",
+        [GoalSong, BossKeyCount, BossKeysRequired, BossKeyName],
     ),
     OptionGroup(
         "Modifiers",

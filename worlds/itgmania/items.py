@@ -57,6 +57,10 @@ def create_item(world: ITGMania, name: str) -> ITGManiaItem:
     if trap_item:
         return ITGManiaItem(name, ItemClassification.trap, trap_item, world.player)
 
+    bosskey = world.itgm_collection.bosskey_items.get(name)
+    if bosskey:
+        return ITGManiaItem(name, ItemClassification.progression, bosskey, world.player)
+
     filler = world.itgm_collection.filler_items.get(name)
     if filler:
         return ITGManiaItem(name, ItemClassification.filler, filler, world.player)
@@ -85,19 +89,31 @@ def create_all_items(world: ITGMania) -> None:
         active_suffixes.append("-quint")
 
     num_charts = len(world.starting_songs) + len(world.included_songs)
+    if world.options.game_mode == 1:
+        num_charts += 1
+        
     location_count = num_charts * len(active_suffixes)
 
     # 1. Add 1 copy of every song in included_songs (these are the unlockable songs)
     for song_name in world.included_songs:
         world.multiworld.itempool.append(create_item(world, song_name))
 
-    # 2. Add speed/appearance mod items if enabled
+    # 2. Add Boss Keys if in Boss Key mode
+    if world.options.game_mode == 1:
+        from .options import BOSS_KEY_NAME_BY_KEY
+        bosskey_name = BOSS_KEY_NAME_BY_KEY[world.options.boss_key_name.current_key]
+        for _ in range(world.options.boss_key_count.value):
+            world.multiworld.itempool.append(create_item(world, bosskey_name))
+
+    # 3. Add speed/appearance mod items if enabled
     if world.options.enable_mod_items:
         for mod_name in world.itgm_collection.mod_items.keys():
             world.multiworld.itempool.append(create_item(world, mod_name))
 
-    # 3. Fill the remaining spots with filler items or traps
+    # 4. Fill the remaining spots with filler items or traps
     item_count = len(world.included_songs)
+    if world.options.game_mode == 1:
+        item_count += world.options.boss_key_count.value
     if world.options.enable_mod_items:
         item_count += len(world.itgm_collection.mod_items)
         

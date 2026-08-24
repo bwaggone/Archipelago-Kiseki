@@ -64,32 +64,66 @@ class ITGMania(World):
         if len(available_charts) < num_charts:
             raise OptionError(f"Not enough charts found in charts.csv to fulfill the requested {num_charts} charts (found {len(available_charts)} available charts).")
 
-        selected_charts = self.random.sample(available_charts, num_charts)
-        self.random.shuffle(selected_charts)
-
-        self.starting_songs = [chart.name for chart in selected_charts[:num_starting]]
-        self.included_songs = [chart.name for chart in selected_charts[num_starting:]]
-
-        if self.options.enable_mod_items:
-            active_suffixes = ["-0", "-1"]
-            if self.options.include_85_score_checks: active_suffixes.append("-85")
-            if self.options.include_90_score_checks: active_suffixes.append("-90")
-            if self.options.include_96_score_checks: active_suffixes.append("-96")
-            if self.options.include_98_score_checks: active_suffixes.append("-98")
-            if self.options.include_99_score_checks: active_suffixes.append("-99")
-            if self.options.include_quad_score_checks: active_suffixes.append("-quad")
-            if self.options.include_quint_score_checks: active_suffixes.append("-quint")
-
-            location_count = num_charts * len(active_suffixes)
-            unlocks_count = num_charts - num_starting
-            mod_count = len(self.itgm_collection.mod_items)
-
-            if location_count < unlocks_count + mod_count:
+        if self.options.game_mode == 1:
+            if self.options.boss_keys_required.value > self.options.boss_key_count.value:
                 raise OptionError(
-                    f"Not enough locations ({location_count}) to hold both unlockable songs ({unlocks_count}) "
-                    f"and enabled mod items ({mod_count}). Please increase 'number_of_charts' or decrease "
-                    f"'number_of_starting_charts' or enable more score checks."
+                    f"Boss Keys Required ({self.options.boss_keys_required.value}) cannot be greater than "
+                    f"Boss Key Count ({self.options.boss_key_count.value})."
                 )
+
+            goal_song_name = self.options.goal_song.value.strip()
+            if goal_song_name:
+                goal_chart = next((c for c in available_charts if c.name == goal_song_name), None)
+                if not goal_chart:
+                    raise OptionError(f"Goal Song '{goal_song_name}' not found in available charts catalog (songs.csv).")
+            else:
+                # Randomly choose Goal Song from all available charts
+                goal_chart = self.random.choice(available_charts)
+                goal_song_name = goal_chart.name
+
+            self.goal_song = goal_song_name
+            non_goal_candidates = [c for c in available_charts if c.name != goal_song_name]
+
+            # We need num_charts - 1 other charts
+            if len(non_goal_candidates) < num_charts - 1:
+                raise OptionError(f"Not enough charts to select {num_charts - 1} non-goal songs.")
+
+            selected_charts = self.random.sample(non_goal_candidates, num_charts - 1)
+            self.random.shuffle(selected_charts)
+
+            # Split into starting and included (excluding Goal Song which has no unlock item)
+            self.starting_songs = [chart.name for chart in selected_charts[:num_starting]]
+            self.included_songs = [chart.name for chart in selected_charts[num_starting:]]
+        else:
+            selected_charts = self.random.sample(available_charts, num_charts)
+            self.random.shuffle(selected_charts)
+
+            self.starting_songs = [chart.name for chart in selected_charts[:num_starting]]
+            self.included_songs = [chart.name for chart in selected_charts[num_starting:]]
+
+        active_suffixes = ["-0", "-1"]
+        if self.options.include_85_score_checks: active_suffixes.append("-85")
+        if self.options.include_90_score_checks: active_suffixes.append("-90")
+        if self.options.include_96_score_checks: active_suffixes.append("-96")
+        if self.options.include_98_score_checks: active_suffixes.append("-98")
+        if self.options.include_99_score_checks: active_suffixes.append("-99")
+        if self.options.include_quad_score_checks: active_suffixes.append("-quad")
+        if self.options.include_quint_score_checks: active_suffixes.append("-quint")
+
+        location_count = num_charts * len(active_suffixes)
+        unlocks_count = len(self.included_songs)
+        
+        mandatory_items = unlocks_count
+        if self.options.game_mode == 1:
+            mandatory_items += self.options.boss_key_count.value
+        if self.options.enable_mod_items:
+            mandatory_items += len(self.itgm_collection.mod_items)
+
+        if location_count < mandatory_items:
+            raise OptionError(
+                f"Not enough locations ({location_count}) to hold all mandatory items ({mandatory_items}). "
+                f"Please increase 'number_of_charts' or decrease 'number_of_starting_charts' or enable more score checks."
+            )
 
         # Programmatically exclude high score locations from progression
         high_score_suffixes = []
@@ -102,7 +136,11 @@ class ITGMania(World):
         if self.options.include_quint_score_checks:
             high_score_suffixes.append("-quint")
 
-        for song in self.starting_songs + self.included_songs:
+        all_active_songs = self.starting_songs + self.included_songs
+        if self.options.game_mode == 1:
+            all_active_songs.append(self.goal_song)
+
+        for song in all_active_songs:
             for suffix in high_score_suffixes:
                 self.options.exclude_locations.value.add(f"{song}{suffix}")
 
@@ -157,5 +195,16 @@ class ITGMania(World):
         )
         slot_data["deathlink_enabled"] = bool(self.options.death_link.value)
         slot_data["trap_items"] = list(self.options.trap_items.value)
+        
+        slot_data["game_mode"] = self.options.game_mode.value
+        if self.options.game_mode == 1:
+            slot_data["goal_song"] = self.goal_song
+            slot_data["bosskey_name"] = itgm_options.BOSS_KEY_NAME_BY_KEY[self.options.boss_key_name.current_key]
+            slot_data["bosskeys_required"] = min(self.options.boss_keys_required.value, self.options.boss_key_count.value)
+        else:
+            slot_data["goal_song"] = ""
+            slot_data["bosskey_name"] = ""
+            slot_data["bosskeys_required"] = 0
+            
         return slot_data
 
