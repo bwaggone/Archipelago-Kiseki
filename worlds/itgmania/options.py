@@ -149,7 +149,7 @@ class GameMode(Choice):
 
 
 class GoalSong(FreeText):
-    """The exact song title (from songs.csv) that is your Goal Song.
+    """The exact song title (from your song pool) that is your Goal Song.
     Leave empty to randomly select one from your selected charts.
     """
     display_name = "Goal Song"
@@ -197,6 +197,15 @@ BOSS_KEY_NAME_BY_KEY = {
 }
 
 
+class CustomSongPool(OptionList):
+    """
+    A list of custom song names (folder names or relative paths) to include in the randomizer pool.
+    If empty, the world will fall back to Club Fantastic 1 & 2.
+    """
+    display_name = "Custom Song Pool"
+    default = []
+
+
 @dataclass
 class ITGManiaOptions(PerGameCommonOptions, DeathLinkMixin):
     game_mode: GameMode
@@ -222,13 +231,14 @@ class ITGManiaOptions(PerGameCommonOptions, DeathLinkMixin):
     trap_items: TrapItems
     trap_chance: TrapChance
     death_link: DeathLink
+    custom_song_pool: CustomSongPool
 
 
 # If we want to group our options by similar type, we can do so as well. This looks nice on the website.
 option_groups = [
     OptionGroup(
         "General Settings & Game Mode",
-        [GameMode, NumberOfStartingCharts, NumberOfCharts, PassingScore, GroupSize],
+        [GameMode, NumberOfStartingCharts, NumberOfCharts, PassingScore, GroupSize, CustomSongPool],
     ),
     OptionGroup(
         "Clear Count Mode Options",

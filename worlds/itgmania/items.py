@@ -2,9 +2,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Dict
 from BaseClasses import Item, ItemClassification
 
-import csv
+import sys
 import os
 from math import floor
+import settings
+import Utils
 
 if TYPE_CHECKING:
     from .world import ITGMania
@@ -17,15 +19,84 @@ class ITGManiaItem(Item):
     game = "ITGMania"
 
 class ITGManiaChart():
-    def __init__(self, name, style, difficulty, hash):
+    def __init__(self, name: str, style: str = "Dance_Single", difficulty: str = "Challenge", hash: str = ""):
         self.name = name
         self.style = style
         self.difficulty = difficulty
         self.hash = hash
-    name = None
-    style = None
-    difficulty = None
-    hash = None
+
+CLUB_FANTASTIC_POOLS = [
+    # Club Fantastic Season 1
+    "Club Fantastic Season 1/BACK UP",
+    "Club Fantastic Season 1/BOSSY",
+    "Club Fantastic Season 1/Can't You Bounce!?",
+    "Club Fantastic Season 1/COOL_EXCEPTION",
+    "Club Fantastic Season 1/Dysangel",
+    "Club Fantastic Season 1/Fantastic World",
+    "Club Fantastic Season 1/Horsepower",
+    "Club Fantastic Season 1/Melody Mountain",
+    "Club Fantastic Season 1/Oceania 909",
+    "Club Fantastic Season 1/Roadman",
+    "Club Fantastic Season 1/Shoes",
+    "Club Fantastic Season 1/Six Million",
+    "Club Fantastic Season 1/Wandering (VIP)",
+    "Club Fantastic Season 1/Y.E.A.H.",
+    # Club Fantastic Season 2
+    "Club Fantastic Season 2/Adore",
+    "Club Fantastic Season 2/Artifacts",
+    "Club Fantastic Season 2/Beachside Photoshoot",
+    "Club Fantastic Season 2/BOSSY (Jorts Speedy Mix)",
+    "Club Fantastic Season 2/demonstration protocol",
+    "Club Fantastic Season 2/DNA",
+    "Club Fantastic Season 2/Oceania 909 (T2KAZUYA Remix)",
+    "Club Fantastic Season 2/POT",
+    "Club Fantastic Season 2/Save New Jersey",
+    "Club Fantastic Season 2/Singularity",
+    "Club Fantastic Season 2/SSS",
+    "Club Fantastic Season 2/Step It",
+    "Club Fantastic Season 2/Succulynt",
+    "Club Fantastic Season 2/SWEETHEART",
+    "Club Fantastic Season 2/TerpZone",
+    "Club Fantastic Season 2/We Can Bounce!!",
+    "Club Fantastic Season 2/Wipeout",
+    "Club Fantastic Season 2/WRVTH",
+]
+
+def extract_custom_songs_from_yamls() -> set[str]:
+    custom_songs = set()
+    if "--player_files_path" in sys.argv:
+        folder_path = sys.argv[sys.argv.index("--player_files_path") + 1]
+    else:
+        try:
+            folder_path = Utils.user_path(settings.get_settings().generator.player_files_path)
+        except Exception:
+            return custom_songs
+            
+    if not os.path.isdir(folder_path):
+        return custom_songs
+
+    try:
+        for entry in os.scandir(folder_path):
+            if not entry.is_file() or not (entry.name.endswith(".yaml") or entry.name.endswith(".yml")):
+                continue
+            try:
+                with open(entry.path, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+                    if "custom_song_pool" not in file_content:
+                        continue
+                    for parsed_yaml in Utils.parse_yamls(file_content):
+                        itg_options = parsed_yaml.get("ITGMania", {})
+                        pool = itg_options.get("custom_song_pool", None)
+                        if isinstance(pool, list):
+                            for song in pool:
+                                if isinstance(song, str) and song.strip():
+                                    custom_songs.add(song.strip())
+            except Exception:
+                pass
+    except Exception:
+        pass
+            
+    return custom_songs
 
 ALL_CHARTS = None
 
@@ -34,18 +105,12 @@ def get_song_data() -> list[ITGManiaChart]:
     if ALL_CHARTS is not None:
         return ALL_CHARTS
 
-    ALL_CHARTS = []
-    seen_names = set()
-    with open(os.path.join(os.getcwd(), "worlds/ITGMania/songs.csv"), mode="r", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        for row in reader:
-            chart_name = row[0]
-            if chart_name not in seen_names:
-                seen_names.add(chart_name)
-                ALL_CHARTS.append(ITGManiaChart(chart_name, row[1], row[2], row[3]))
+    custom_pool_union = extract_custom_songs_from_yamls()
+    combined_names = sorted(list(set(CLUB_FANTASTIC_POOLS) | custom_pool_union))
+    ALL_CHARTS = [ITGManiaChart(name) for name in combined_names]
     return ALL_CHARTS
 
-chart_pool = get_song_data()
+ALL_CHARTS = get_song_data()
 
 def create_item(world: ITGMania, name: str) -> ITGManiaItem:
     mod_item = world.itgm_collection.mod_items.get(name)

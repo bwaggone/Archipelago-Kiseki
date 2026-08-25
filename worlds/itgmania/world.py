@@ -56,13 +56,20 @@ class ITGMania(World):
                 f"{invalid_trap} - must be chosen from: {list(self.itgm_collection.trap_items.keys())}."
             )
 
-        available_charts = [c for c in get_song_data() if c.style == "Dance_Single"]
+        custom_pool = {song.strip() for song in self.options.custom_song_pool.value if song.strip()}
+        if custom_pool:
+            available_charts = [c for c in get_song_data() if c.name in custom_pool and c.style == "Dance_Single"]
+        else:
+            available_charts = [c for c in get_song_data() if c.name in items.CLUB_FANTASTIC_POOLS and c.style == "Dance_Single"]
 
         num_charts = self.options.number_of_charts.value
         num_starting = min(self.options.number_of_starting_charts.value, num_charts)
 
         if len(available_charts) < num_charts:
-            raise OptionError(f"Not enough charts found in charts.csv to fulfill the requested {num_charts} charts (found {len(available_charts)} available charts).")
+            raise OptionError(
+                f"Not enough charts found to fulfill the requested {num_charts} charts "
+                f"(found {len(available_charts)} available charts)."
+            )
 
         if self.options.game_mode == 1:
             if self.options.boss_keys_required.value > self.options.boss_key_count.value:
@@ -75,7 +82,7 @@ class ITGMania(World):
             if goal_song_name:
                 goal_chart = next((c for c in available_charts if c.name == goal_song_name), None)
                 if not goal_chart:
-                    raise OptionError(f"Goal Song '{goal_song_name}' not found in available charts catalog (songs.csv).")
+                    raise OptionError(f"Goal Song '{goal_song_name}' not found in the available charts catalog.")
             else:
                 # Randomly choose Goal Song from all available charts
                 goal_chart = self.random.choice(available_charts)
